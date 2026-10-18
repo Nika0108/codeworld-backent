@@ -176,7 +176,7 @@ public class ExportService {
 
             XWPFRun titleRun = title.createRun();
             titleRun.setText(
-                    "CODE WORLD – MÜRACİƏTLƏRİN SİYAHISI"
+                    "Code World Təcrübə və Təqaüd Proqramına Qeydiyyatdan Keçənlər"
             );
             titleRun.setBold(true);
             titleRun.setFontSize(16);

@@ -37,6 +37,8 @@ public class ApplicationCreateRequest {
 
     private String cv;
 
+    private String feedback;
+
     public String getName() {
         return name;
     }
@@ -99,5 +101,13 @@ public class ApplicationCreateRequest {
 
     public void setCv(String cv) {
         this.cv = cv;
+    }
+
+    public String getFeedback() {
+        return feedback;
+    }
+
+    public void setFeedback(String feedback) {
+        this.feedback = feedback;
     }
 }

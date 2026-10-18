@@ -30,21 +30,14 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
     WHERE (:field IS NULL OR a.field = :field)
     AND (:educationType IS NULL OR a.educationType = :educationType)
     AND (:status IS NULL OR a.status = :status)
-    AND (CAST(:name AS string) IS NULL OR LOWER(a.name) LIKE LOWER(CONCAT('%', CAST(:name AS string), '%')))
-    AND (CAST(:email AS string) IS NULL OR LOWER(a.email) LIKE LOWER(CONCAT('%', CAST(:email AS string), '%')))
-    AND (:fromDate IS NULL OR a.createdAt >= :fromDate)
-    AND (:toDate IS NULL OR a.createdAt <= :toDate)
+    AND (CAST(:fromDate AS timestamp) IS NULL OR a.createdAt >= :fromDate)
+    AND (CAST(:toDate AS timestamp) IS NULL OR a.createdAt <= :toDate)
     """)
-    List<Application> searchApplications(
+    List<Application> searchApplicationsWithoutText(
             @Param("field") FieldType field,
             @Param("educationType") EducationType educationType,
             @Param("status") ApplicationStatus status,
-            @Param("name") String name,
-            @Param("email") String email,
             @Param("fromDate") LocalDateTime fromDate,
-            @Param("toDate") LocalDateTime toDate,
-            @Param("namePattern") String namePattern,
-            @Param("emailPattern") String emailPattern
-
+            @Param("toDate") LocalDateTime toDate
     );
 }

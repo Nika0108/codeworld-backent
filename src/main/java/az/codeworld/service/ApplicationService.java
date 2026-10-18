@@ -13,14 +13,16 @@ import az.codeworld.exception.ApiException;
 import az.codeworld.repository.ApplicationRepository;
 import az.codeworld.repository.ApplicationStatusHistoryRepository;
 import az.codeworld.repository.ProgramRepository;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.Year;
-import org.springframework.web.multipart.MultipartFile;
-import java.io.IOException;
+import java.util.Base64;
 import java.util.List;
 
 @Service
@@ -33,14 +35,14 @@ public class ApplicationService {
     public ApplicationService(
             ApplicationRepository applicationRepository,
             ProgramRepository programRepository,
-            ApplicationStatusHistoryRepository historyRepository) {
-
+            ApplicationStatusHistoryRepository historyRepository
+    ) {
         this.applicationRepository = applicationRepository;
         this.programRepository = programRepository;
         this.historyRepository = historyRepository;
     }
 
-    // Yeni müraciət
+    // Yeni müraciət yaratmaq
     @Transactional
     public ApplicationResponse create(ApplicationCreateRequest request) {
 
@@ -88,16 +90,23 @@ public class ApplicationService {
         application.setMotivation(request.getMotivation());
         application.setEducationType(request.getEducationType());
         application.setField(request.getField());
+
+        // Feedback məlumatını yadda saxlamaq
+        application.setFeedback(request.getFeedback());
+
+        // CV Base64 formatında göndərilibsə, byte[] formatına çeviririk
         application.setCv(
-                request.getCv() != null
-                        ? java.util.Base64.getDecoder().decode(request.getCv())
+                request.getCv() != null && !request.getCv().isBlank()
+                        ? Base64.getDecoder().decode(request.getCv())
                         : null
         );
+
         application.setProgram(activeProgram);
         application.setStatus(ApplicationStatus.PENDING);
 
         Application saved = applicationRepository.save(application);
 
+        // İlkin status tarixçəsi
         ApplicationStatusHistory history =
                 ApplicationStatusHistory.builder()
                         .application(saved)
@@ -109,6 +118,7 @@ public class ApplicationService {
 
         return toResponse(saved);
     }
+
     // CV faylını müraciətə yükləmək
     @Transactional
     public String uploadCv(Long id, MultipartFile file) throws IOException {
@@ -116,13 +126,20 @@ public class ApplicationService {
         Application application = findApplication(id);
 
         if (file == null || file.isEmpty()) {
-            throw new ApiException("CV faylı boşdur", HttpStatus.BAD_REQUEST);
+            throw new ApiException(
+                    "CV faylı boşdur",
+                    HttpStatus.BAD_REQUEST
+            );
         }
 
         String filename = file.getOriginalFilename();
 
-        if (filename == null || !filename.toLowerCase().endsWith(".pdf")) {
-            throw new ApiException("Yalnız PDF faylı yükləmək olar", HttpStatus.BAD_REQUEST);
+        if (filename == null
+                || !filename.toLowerCase().endsWith(".pdf")) {
+            throw new ApiException(
+                    "Yalnız PDF faylı yükləmək olar",
+                    HttpStatus.BAD_REQUEST
+            );
         }
 
         application.setCv(file.getBytes());
@@ -131,8 +148,9 @@ public class ApplicationService {
         return "CV faylı uğurla saxlanıldı: " + filename;
     }
 
-    // Bütün müraciətlər
+    // Bütün müraciətləri gətirmək
     public List<ApplicationResponse> getAll() {
+
         return applicationRepository.findAll()
                 .stream()
                 .map(this::toResponse)
@@ -141,11 +159,13 @@ public class ApplicationService {
 
     // ID-yə görə müraciət
     public ApplicationResponse getById(Long id) {
+
         return toResponse(findApplication(id));
     }
 
     // Proqrama görə müraciətlər
     public List<ApplicationResponse> getByProgramId(Long programId) {
+
         return applicationRepository.findByProgramId(programId)
                 .stream()
                 .map(this::toResponse)
@@ -153,14 +173,17 @@ public class ApplicationService {
     }
 
     // Statusa görə müraciətlər
-    public List<ApplicationResponse> getByStatus(ApplicationStatus status) {
+    public List<ApplicationResponse> getByStatus(
+            ApplicationStatus status
+    ) {
+
         return applicationRepository.findByStatus(status)
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    // Filtrləmə
+    // Müraciətləri filtrləmək və axtarmaq
     public List<ApplicationResponse> search(
             FieldType field,
             EducationType educationType,
@@ -168,28 +191,45 @@ public class ApplicationService {
             String name,
             String email,
             LocalDateTime fromDate,
-            LocalDateTime toDate) {
+            LocalDateTime toDate
+    ) {
 
-        return applicationRepository.searchApplications(
+        List<Application> applications =
+                applicationRepository.searchApplicationsWithoutText(
                         field,
                         educationType,
                         status,
-                        name,
-                        email,
                         fromDate,
-                        toDate,
-                        name == null || name.isBlank() ? null : "%" + name + "%",
-                        email == null || email.isBlank() ? null : "%" + email + "%"
-                ).stream()
+                        toDate
+                );
+
+        return applications.stream()
+                .filter(a ->
+                        name == null
+                                || name.isBlank()
+                                || (a.getName() != null
+                                && a.getName()
+                                .toLowerCase()
+                                .contains(name.trim().toLowerCase()))
+                )
+                .filter(a ->
+                        email == null
+                                || email.isBlank()
+                                || (a.getEmail() != null
+                                && a.getEmail()
+                                .toLowerCase()
+                                .contains(email.trim().toLowerCase()))
+                )
                 .map(this::toResponse)
                 .toList();
     }
 
-    // Status dəyişdirmək
+    // Müraciətin statusunu dəyişmək
     @Transactional
     public ApplicationResponse updateStatus(
             Long id,
-            StatusUpdateRequest request) {
+            StatusUpdateRequest request
+    ) {
 
         Application application = findApplication(id);
 
@@ -198,6 +238,7 @@ public class ApplicationService {
 
         Application saved = applicationRepository.save(application);
 
+        // Yeni statusu tarixçədə saxlamaq
         ApplicationStatusHistory history =
                 ApplicationStatusHistory.builder()
                         .application(saved)
@@ -210,9 +251,10 @@ public class ApplicationService {
         return toResponse(saved);
     }
 
-    // Status tarixçəsi
+    // Müraciətin status tarixçəsi
     public List<ApplicationStatusHistory> getStatusHistory(
-            Long applicationId) {
+            Long applicationId
+    ) {
 
         findApplication(applicationId);
 
@@ -220,15 +262,18 @@ public class ApplicationService {
                 .findByApplicationIdOrderByChangedAtDesc(applicationId);
     }
 
-    // Silmək
+    // Müraciəti silmək
     @Transactional
     public void delete(Long id) {
+
         Application application = findApplication(id);
+
         applicationRepository.delete(application);
     }
 
     // Ümumi müraciət sayı
     public long getTotalApplicationCount() {
+
         return applicationRepository.count();
     }
 
@@ -245,7 +290,7 @@ public class ApplicationService {
                 .countByProgramId(activeProgram.getId());
     }
 
-    // Aktiv proqram
+    // Aktiv proqramı gətirmək
     public Program getActiveProgram() {
 
         return programRepository.findFirstByIsActiveTrue()
@@ -255,7 +300,9 @@ public class ApplicationService {
                 ));
     }
 
+    // ID-yə görə müraciəti tapmaq
     private Application findApplication(Long id) {
+
         return applicationRepository.findById(id)
                 .orElseThrow(() -> new ApiException(
                         "Müraciət tapılmadı: " + id,
@@ -263,6 +310,7 @@ public class ApplicationService {
                 ));
     }
 
+    // Application obyektini ApplicationResponse-a çevirmək
     private ApplicationResponse toResponse(Application application) {
 
         ApplicationResponse response = new ApplicationResponse();
@@ -276,23 +324,33 @@ public class ApplicationService {
         response.setMotivation(application.getMotivation());
         response.setEducationType(application.getEducationType());
         response.setField(application.getField());
+
+        // Feedback məlumatını cavaba əlavə etmək
         response.setFeedback(application.getFeedback());
+
         response.setStatus(application.getStatus());
         response.setAdminNote(application.getAdminNote());
         response.setCreatedAt(application.getCreatedAt());
+
+        // CV-ni Base64 formatında cavaba əlavə etmək
         response.setCv(
                 application.getCv() == null
                         ? null
-                        : java.util.Base64.getEncoder().encodeToString(application.getCv())
+                        : Base64.getEncoder()
+                        .encodeToString(application.getCv())
         );
 
+        // Proqram məlumatları
         if (application.getProgram() != null) {
+
             response.setProgramId(application.getProgram().getId());
+
             response.setProgramName(
                     application.getProgram().getName()
             );
         }
 
+        // WhatsApp linki
         if (application.getPhone() != null) {
 
             String phone = application.getPhone()
