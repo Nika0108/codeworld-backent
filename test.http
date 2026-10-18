@@ -1,0 +1,15 @@
+GET http://localhost:8080/api/programs
+
+###
+
+POST http://localhost:8080/api/programs
+Content-Type: application/json
+
+{
+  "name": "Code World Təcrübə Proqramı",
+  "type": "EXPERIENCE",
+  "programNumber": 1,
+  "startMonth": 10,
+  "startYear": 2026,
+  "isActive": true
+}
